@@ -1,0 +1,4 @@
+[submodule "dht11"]
+	path = dht11
+	url = https://github.com/hepingood/dht11.git
+	branch = master
