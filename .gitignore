@@ -57,3 +57,4 @@ tools/unit-test-app/output
 # Local ENV
 .envrc
 dependencies.lock
+/build/
