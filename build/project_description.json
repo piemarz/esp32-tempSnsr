@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "app-template",
-    "project_version":    "5b69ba0-dirty",
+    "project_version":    "4f4d99d-dirty",
     "project_path":       "D:/Progetti/esp-workspace/esp32TempSnsr",
     "idf_path":           "D:/Progetti/Espressif/frameworks/esp-idf-v5.1.2",
     "build_dir":          "D:/Progetti/esp-workspace/esp32TempSnsr/build",
@@ -791,7 +791,7 @@
             "managed_priv_reqs": [],
             "file": "D:/Progetti/esp-workspace/esp32TempSnsr/build/esp-idf/main/libmain.a",
             "sources": [ "D:/Progetti/esp-workspace/esp32TempSnsr/main/main.c" ],
-            "include_dirs": [ "../dht11/src", "../dht11/interface" ]
+            "include_dirs": [ "../dht11/src" ]
         },
         "mbedtls": {
             "alias": "idf::mbedtls",

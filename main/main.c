@@ -9,6 +9,7 @@
 #include "soc/soc_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/gpio.h"
 #include "esp_sleep.h"
 #include "esp_log.h"
 #include "driver/rtc_io.h"
@@ -25,18 +26,22 @@ static RTC_DATA_ATTR struct timeval sleep_enter_time;
 static struct timeval sleep_enter_time;
 #endif
 
+static uint8_t staticVar = 1u;
+
 static void deep_sleep_task(void *args);
 
 void app_main(void) {
 
-  const uint64_t wakeupTimeMin = 5;
+  const uint64_t wakeupTimeMin = CONFIG_WAKEUP_TIME_MIN;
 
-  ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(wakeupTimeMin * 60 * 1000000ul));
+  ESP_ERROR_CHECK(
+      esp_sleep_enable_timer_wakeup(wakeupTimeMin * 60 * 1000000ul));
 
   xTaskCreate(deep_sleep_task, "deep_sleep_task", 4096, NULL, 6, NULL);
 
-  while (1u == 1u) {
+  while (1u == staticVar) {
     printf("Hello from app_main!\n");
+    staticVar = 0u;
     sleep(1);
   }
 }
@@ -47,6 +52,11 @@ static void deep_sleep_task(void *args) {
    * does not support RTC mem(such as esp32c2). Because the time overhead of NVS will cause
    * the recorded deep sleep enter time to be not very accurate.
    */
+
+  esp_sleep_wakeup_cause_t wakeup_reason;
+  struct timeval now;
+  int sleep_time_ms;
+
 #if !SOC_RTC_FAST_MEM_SUPPORTED
   // Initialize NVS
   esp_err_t err = nvs_flash_init();
@@ -73,21 +83,59 @@ static void deep_sleep_task(void *args) {
       (int32_t*) &sleep_enter_time.tv_usec);
 #endif
 
-  struct timeval now;
   gettimeofday(&now, NULL);
-  int sleep_time_ms = (now.tv_sec - sleep_enter_time.tv_sec) * 1000
+
+  sleep_time_ms = (now.tv_sec - sleep_enter_time.tv_sec) * 1000
       + (now.tv_usec - sleep_enter_time.tv_usec) / 1000;
 
-  switch (esp_sleep_get_wakeup_cause()) {
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch (wakeup_reason) {
+  case ESP_SLEEP_WAKEUP_EXT0: {
+    printf("Wakeup caused by external signal using RTC_IO");
+    break;
+  }
+  case ESP_SLEEP_WAKEUP_EXT1: {
+    printf("Wakeup caused by external signal using RTC_CNTL");
+    break;
+  }
   case ESP_SLEEP_WAKEUP_TIMER: {
     printf("Wake up from timer. Time spent in deep sleep: %dms\n",
         sleep_time_ms);
     break;
   }
-
+  case ESP_SLEEP_WAKEUP_TOUCHPAD: {
+    printf("Wakeup caused by touchpad");
+    break;
+  }
+  case ESP_SLEEP_WAKEUP_ULP: {
+    printf("Wakeup caused by ULP program");
+    break;
+  }
+  case ESP_SLEEP_WAKEUP_GPIO: {
+    printf("Wakeup caused by GPIO");
+    break;
+  }
+  case ESP_SLEEP_WAKEUP_UART: {
+    printf("Wakeup caused by UART");
+    break;
+  }
+#if SOC_PM_SUPPORT_WIFI_WAKEUP
+  case ESP_SLEEP_WAKEUP_WIFI: {
+    printf("Wakeup caused by WIFI");
+    break;
+  }
+#endif
+#if SOC_PM_SUPPORT_BT_WAKEUP
+  case ESP_SLEEP_WAKEUP_BT: {
+    printf("Wakeup caused by BT");
+    break;
+  }
+#endif
   case ESP_SLEEP_WAKEUP_UNDEFINED:
   default:
     printf("Not a deep sleep reset\n");
+    printf("%d\n\n", (int) wakeup_reason);
   }
 
   vTaskDelay(1000 / portTICK_PERIOD_MS);

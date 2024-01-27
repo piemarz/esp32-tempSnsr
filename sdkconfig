@@ -345,6 +345,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 CONFIG_ESP_WIFI_SSID="myssid"
 CONFIG_ESP_WIFI_PASSWORD="mypassword"
+CONFIG_WAKEUP_TIME_MIN=1
 # end of Example Configuration
 
 #

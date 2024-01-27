@@ -4420,6 +4420,16 @@
                 "range": null,
                 "title": "WiFi Password",
                 "type": "string"
+            },
+            {
+                "children": [],
+                "depends_on": null,
+                "help": "No help",
+                "id": "WAKEUP_TIME_MIN",
+                "name": "WAKEUP_TIME_MIN",
+                "range": null,
+                "title": "Wake-up time (min)",
+                "type": "int"
             }
         ],
         "depends_on": null,
