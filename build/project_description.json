@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "app-template",
-    "project_version":    "4f4d99d-dirty",
+    "project_version":    "2a20acc-dirty",
     "project_path":       "D:/Progetti/esp-workspace/esp32TempSnsr",
     "idf_path":           "D:/Progetti/Espressif/frameworks/esp-idf-v5.1.2",
     "build_dir":          "D:/Progetti/esp-workspace/esp32TempSnsr/build",
@@ -11,7 +11,7 @@
     "app_elf":            "app-template.elf",
     "app_bin":            "app-template.bin",
     "build_type":         "flash_app",
-    "git_revision":       "v5.1.2-dirty",
+    "git_revision":       "v5.1.2",
     "target":             "esp32",
     "rev":                "0",
     "min_rev":            "0",
@@ -790,8 +790,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "D:/Progetti/esp-workspace/esp32TempSnsr/build/esp-idf/main/libmain.a",
-            "sources": [ "D:/Progetti/esp-workspace/esp32TempSnsr/main/main.c" ],
-            "include_dirs": [ "../dht11/src" ]
+            "sources": [ "D:/Progetti/esp-workspace/esp32TempSnsr/main/main.c", "D:/Progetti/esp-workspace/esp32TempSnsr/main/deepSleep/deepSleep.c", "D:/Progetti/esp-workspace/esp32TempSnsr/main/driverDHT11Interface/driverDHT11Interface.c" ],
+            "include_dirs": [ ".", "./deepSleep", "./driverDHT11Interface", "../dht11/src" ]
         },
         "mbedtls": {
             "alias": "idf::mbedtls",

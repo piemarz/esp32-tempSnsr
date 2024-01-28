@@ -1,20 +1,25 @@
 # put here your custom config value
-menu "Example Configuration"
+menu "ESP32 temperature and humidity sensor"
+menu "Wi-Fi"
 config ESP_WIFI_SSID
-    string "WiFi SSID"
-    default "myssid"
-    help
-	SSID (network name) for the example to connect to.
+  string "WiFi SSID"
+  default "myssid"
+  help
+  SSID (network name) for the example to connect to.
 
 config ESP_WIFI_PASSWORD
-    string "WiFi Password"
-    default "mypassword"
-    help
-	WiFi password (WPA or WPA2) for the example to use.
+  string "WiFi Password"
+  default "mypassword"
+  help
+  WiFi password (WPA or WPA2) for the example to use.
+endmenu
 
-config WAKEUP_TIME_MIN
-    int "Wake-up time (min)"
-    default 1
-    help
-  No help
+menu "Sleep time"
+config WAKEUP_TIME_SEC
+  int "Wake-up time (sec)"
+  default 60
+  range 1 43200
+  help 
+  Set the wakeup timer. Min 1 sec max 12 hours
+endmenu
 endmenu

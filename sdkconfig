@@ -341,12 +341,22 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Example Configuration
+# ESP32 temperature and humidity sensor
+#
+
+#
+# Wi-Fi
 #
 CONFIG_ESP_WIFI_SSID="myssid"
 CONFIG_ESP_WIFI_PASSWORD="mypassword"
-CONFIG_WAKEUP_TIME_MIN=1
-# end of Example Configuration
+# end of Wi-Fi
+
+#
+# Sleep time
+#
+CONFIG_WAKEUP_TIME_SEC=60
+# end of Sleep time
+# end of ESP32 temperature and humidity sensor
 
 #
 # Compiler options
