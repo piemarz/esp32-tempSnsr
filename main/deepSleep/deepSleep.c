@@ -4,8 +4,7 @@
  *  Created on: 28 Jan 2024
  *      Author: pierl
  */
-
-#include "main.h"
+#if defined(CONFIG_MYAPP_WAKEUP_EN)
 #include "deepSleep.h"
 #include "esp_sleep.h"
 #include <sys/time.h>
@@ -24,12 +23,14 @@ static struct timeval sleep_enter_time;
 
 static void deepSleepTask(void *args);
 
-void deepSleepInit(void) {
-
-  if (0ul != CONFIG_WAKEUP_TIME_SEC) {
+uint8_t deepSleepInit(void) {
+  if (0ul != CONFIG_MYAPP_WAKEUP_TIME_SEC) {
     ESP_ERROR_CHECK(
-        esp_sleep_enable_timer_wakeup(CONFIG_WAKEUP_TIME_SEC * 1000000ul));
+        esp_sleep_enable_timer_wakeup(CONFIG_MYAPP_WAKEUP_TIME_SEC * 1000000ul));
+  } else {
+    return false;
   }
+  return true;
 }
 
 void deepSleepRun(void) {
@@ -155,3 +156,4 @@ static void deepSleepTask(void *args) {
   // enter deep sleep
   esp_deep_sleep_start();
 }
+#endif

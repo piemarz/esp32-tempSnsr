@@ -8,7 +8,9 @@
 #ifndef MAIN_DEEPSLEEP_DEEPSLEEP_H_
 #define MAIN_DEEPSLEEP_DEEPSLEEP_H_
 
-void deepSleepInit(void);
+#include "main.h"
+
+uint8_t deepSleepInit(void);
 
 void deepSleepRun(void);
 

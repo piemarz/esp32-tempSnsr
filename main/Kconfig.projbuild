@@ -1,25 +1,44 @@
 # put here your custom config value
+
 menu "ESP32 temperature and humidity sensor"
-menu "Wi-Fi"
-config ESP_WIFI_SSID
-  string "WiFi SSID"
-  default "myssid"
-  help
-  SSID (network name) for the example to connect to.
+  menu "Wi-Fi"
+    config MYAPP_WIFI_SSID
+      string "WiFi SSID"
+      default "myssid"
+      help
+      SSID (network name) for the example to connect to.
 
-config ESP_WIFI_PASSWORD
-  string "WiFi Password"
-  default "mypassword"
-  help
-  WiFi password (WPA or WPA2) for the example to use.
-endmenu
+    config MYAPP_WIFI_PASSWORD
+      string "WiFi Password"
+      default "mypassword"
+      help
+      WiFi password (WPA or WPA2) for the example to use.
+  endmenu
 
-menu "Sleep time"
-config WAKEUP_TIME_SEC
-  int "Wake-up time (sec)"
-  default 60
-  range 1 43200
-  help 
-  Set the wakeup timer. Min 1 sec max 12 hours
-endmenu
+  menu "Sleep time"
+    config MYAPP_WAKEUP_EN
+      bool "Enable sleep"
+      default n
+      help
+      Enable deep sleep feature
+
+    config MYAPP_WAKEUP_TIME_SEC
+      depends on MYAPP_WAKEUP_EN
+      int "Wake-up time (sec)"
+      default 60
+      range 1 43200
+      help 
+      Set the wakeup timer. Min 1 sec max 12 hours
+  endmenu
+
+  menu "GPIO"
+      orsource "$IDF_PATH/examples/common_components/env_caps/$IDF_TARGET/Kconfig.env_caps"
+
+      config MYAPP_GPIO_COMMUNICATION_PIN
+      int "GPIO communication pin"
+      default 1
+      range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+      help
+      This is the GPIO used for the Single-Wire Two-Way communication with DHT11 sensor
+  endmenu
 endmenu

@@ -38,8 +38,9 @@
 #ifndef DRIVER_DHT11_INTERFACE_H
 #define DRIVER_DHT11_INTERFACE_H
 
+#include "main.h"
+
 #include "driver_dht11.h"
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C"{

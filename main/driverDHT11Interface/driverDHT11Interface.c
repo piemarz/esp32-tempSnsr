@@ -47,7 +47,7 @@
  */
 uint8_t dht11_interface_init(void)
 {
-    return 0;
+    return false;
 }
 
 /**
