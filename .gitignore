@@ -58,3 +58,6 @@ tools/unit-test-app/output
 .envrc
 dependencies.lock
 /build/
+
+# Gostwriter Md backup
+*.md.backup

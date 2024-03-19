@@ -6,14 +6,13 @@ idf_component_register(
     SRCS
     main.c
     deepSleep/deepSleep.c
-    driverDHT11Interface/driverDHT11Interface.c
+    dht/dhtDriver.c
     
     # optional, add here public include directories
     INCLUDE_DIRS
     .
     ./deepSleep
-    ./driverDHT11Interface
-    ../dht11/src
+    ./dht
     
     PRIV_INCLUDE_DIRS   # optional, add here private include directories
     REQUIRES            # optional, list the public requirements (component names)
