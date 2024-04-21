@@ -1,7 +1,7 @@
 /*
- * main.h
+ * config.h
  *
- *  Created on: 28 Jan 2024
+ *  Created on: 5 Mar 2024
  *      Author: piemarz
  *
  *  MIT License
@@ -28,47 +28,12 @@
  *
  */
 
-#ifndef MAIN_MAIN_H_
-#define MAIN_MAIN_H_
+#ifndef CONFIG_H_
+#define CONFIG_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/************************************
- * INCLUDES
- ************************************/
-#include <unistd.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <sys/time.h>
-
-#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-/************************************
- * MACROS AND DEFINES
- ************************************/
-#define LOW   (0u)
-#define HIGH  (1u)
-
-/************************************
- * TYPEDEFS
- ************************************/
-
-/************************************
- * EXPORTED VARIABLES
- ************************************/
-
-/************************************
- * GLOBAL FUNCTION PROTOTYPES
- ************************************/
+#define TIME_TO_SLEEP   30        /* Time ESP32 will go to sleep (in seconds) */
+#define DHT_PIN         27        /* ESP32 communication pin with DHT11/DHT22 */
 
 
-#ifdef __cplusplus
-}
-#endif
 
-#endif /* MAIN_MAIN_H_ */
+#endif /* CONFIG_H_ */
