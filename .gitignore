@@ -3,3 +3,6 @@
 
 # Personal config.h file
 config.h
+
+# Output folder
+output/*

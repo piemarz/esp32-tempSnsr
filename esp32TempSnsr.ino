@@ -28,6 +28,14 @@
  *
  */
 
+/** Include directives */
+#include <DHTesp.h>       /** Click here to get the library: http://librarymanager/All#DHTesp */
+#include <WiFi.h>
+#include <MQTTClient.h>   /** Click here to get the library: http://librarymanager/All#MQTT */
+#include <ArduinoJson.h>  /** Click here to get the library: http://librarymanager/All#ArduinoJson */
+#include "config.h"
+
+/** Check configurations */
 #ifndef ESP32
 #pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
 #error Select ESP32 board.
@@ -38,26 +46,66 @@
 #error The file config.h needs to be added.
 #endif
 
-#include <DHTesp.h> // Click here to get the library: http://librarymanager/All#DHTesp
-#include "config.h"
-
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 
 bool getTemperature();
 void print_wakeup_reason();
 void getChipId();
+void connectToMQTT();
+void sendToMQTT();
+void messageHandler(String &topic, String &payload);
 
 RTC_DATA_ATTR int bootCount = 0;
 uint32_t chipId = 0;
 DHTesp dht;
 /** Comfort profile */
 ComfortState cf;
+bool connectionUp = true;
+
+/*TEST*/
+struct TEST {
+  float temperature;
+  float humidity;
+  float heatIndex;
+  float dewPoint;
+  String comfort;
+};
+struct TEST TESTT;
+
+WiFiClient network;
+MQTTClient mqtt = MQTTClient(256);
 
 void setup() {
   /* Initialize serial */
   Serial.begin(115200);
   delay(100); /* wait 100 ms to let Serial monitor initialize */
   getChipId();
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.println("ESP32 - Connecting to Wi-Fi");
+
+  uint8_t tentatives = ATTEMPING_CONNECTION;
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    tentatives--;
+    Serial.print(".");
+    if (tentatives == 0u) 
+    {
+      Serial.println();
+      Serial.println("Unable to connect to " + String(WIFI_SSID));
+      connectionUp = false;
+      break;
+    }
+  }
+  Serial.println();
+  
+  if (connectionUp) 
+  {
+    connectToMQTT();
+  }
 
   //Increment boot number and print it every reboot
   ++bootCount;
@@ -139,6 +187,17 @@ bool getTemperature() {
   };
 
   Serial.println(" T:" + String(newValues.temperature) + " H:" + String(newValues.humidity) + " I:" + String(heatIndex) + " D:" + String(dewPoint) + " " + comfortStatus);
+  TESTT.temperature = newValues.temperature;
+  TESTT.humidity = newValues.humidity;
+  TESTT.heatIndex = heatIndex;
+  TESTT.dewPoint = dewPoint;
+  TESTT.comfort = comfortStatus;
+  
+  if (connectionUp) 
+  {
+    sendToMQTT();
+  }
+  
 	return true;
 }
 
@@ -170,4 +229,61 @@ void getChipId() {
 	Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
 	Serial.printf("This chip has %d cores\n", ESP.getChipCores());
   Serial.print("Chip ID: "); Serial.println(chipId);
+}
+
+void connectToMQTT() {
+  // Connect to the MQTT broker
+  mqtt.begin(MQTT_BROKER_ADRRESS, MQTT_PORT, network);
+
+  // Create a handler for incoming messages
+  mqtt.onMessage(messageHandler);
+
+  Serial.print("ESP32 - Connecting to MQTT broker");
+
+  while (!mqtt.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
+    Serial.print(".");
+    delay(100);
+  }
+  Serial.println();
+
+  if (!mqtt.connected()) {
+    Serial.println("ESP32 - MQTT broker Timeout!");
+    return;
+  }
+
+  // Subscribe to a topic, the incoming messages are processed by messageHandler() function
+  if (mqtt.subscribe(SUBSCRIBE_TOPIC))
+    Serial.print("ESP32 - Subscribed to the topic: ");
+  else
+    Serial.print("ESP32 - Failed to subscribe to the topic: ");
+
+  Serial.println(SUBSCRIBE_TOPIC);
+  Serial.println("ESP32 - MQTT broker Connected!");
+}
+
+void sendToMQTT() {
+  JsonDocument message;
+  message["timestamp"] = millis();
+  message["Temperature"] = TESTT.temperature;
+  message["humidity"] = TESTT.humidity;
+  message["heatIndex"] = TESTT.heatIndex;
+  message["dewPoint"] = TESTT.dewPoint;
+  message["comfort"] = TESTT.comfort;
+  char messageBuffer[1024];
+  serializeJson(message, messageBuffer);
+
+  mqtt.publish(PUBLISH_TOPIC, messageBuffer);
+
+  Serial.println("ESP32 - sent to MQTT:");
+  Serial.print("- topic: ");
+  Serial.println(PUBLISH_TOPIC);
+  Serial.print("- payload:");
+  Serial.println(messageBuffer);
+}
+
+void messageHandler(String &topic, String &payload) {
+  Serial.println("ESP32 - received from MQTT:");
+  Serial.println("- topic: " + topic);
+  Serial.println("- payload:");
+  Serial.println(payload);
 }

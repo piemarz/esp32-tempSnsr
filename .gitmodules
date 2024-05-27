@@ -1,4 +1,0 @@
-[submodule "DHTesp"]
-	path = DHTesp
-	url = https://github.com/beegee-tokyo/DHTesp.git
-	branch = master

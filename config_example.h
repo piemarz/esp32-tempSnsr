@@ -1,3 +1,4 @@
+
 /*
  * config.h
  *
@@ -34,6 +35,17 @@
 #define TIME_TO_SLEEP   30        /* Time ESP32 will go to sleep (in seconds) */
 #define DHT_PIN         27        /* ESP32 communication pin with DHT11/DHT22 */
 
+const char WIFI_SSID[] = "YOUR_WIFI_SSID";     // CHANGE TO YOUR WIFI SSID
+const char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";  // CHANGE TO YOUR WIFI PASSWORD
 
+const char MQTT_BROKER_ADRRESS[] = "test.mosquitto.org";  // CHANGE TO MQTT BROKER'S ADDRESS
+const int MQTT_PORT = 1883;
+const char MQTT_CLIENT_ID[] = "YOUR-NAME-esp32-001";  // CHANGE IT AS YOU DESIRE
+const char MQTT_USERNAME[] = "";                        // CHANGE IT IF REQUIRED, empty if not required
+const char MQTT_PASSWORD[] = "";                        // CHANGE IT IF REQUIRED, empty if not required
+
+// The MQTT topics that ESP32 should publish/subscribe
+const char PUBLISH_TOPIC[] = "YOUR-NAME-esp32-001/loopback";    // CHANGE IT AS YOU DESIRE
+const char SUBSCRIBE_TOPIC[] = "YOUR-NAME-esp32-001/loopback";  // CHANGE IT AS YOU DESIRE
 
 #endif /* CONFIG_H_ */
