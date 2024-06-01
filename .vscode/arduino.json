@@ -1,8 +1,8 @@
 {
-    "configuration": "JTAGAdapter=bridge,PSRAM=disabled,PartitionScheme=default,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=4M,UploadSpeed=921600,LoopCore=1,EventsCore=1,DebugLevel=none,EraseFlash=none",
+    "configuration": "JTAGAdapter=bridge,PSRAM=disabled,PartitionScheme=default,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=4M,UploadSpeed=921600,LoopCore=1,EventsCore=1,DebugLevel=verbose,EraseFlash=none",
     "board": "esp32:esp32:esp32",
     "port": "COM3",
     "programmer": "esptool",
     "sketch": "esp32TempSnsr.ino",
-    "output": "./output"
+    "output": "output"
 }

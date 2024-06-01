@@ -1,7 +1,7 @@
 /*
- * config.h
+ * deepSleep.h
  *
- *  Created on: 5 Mar 2024
+ *  Created on: 01 Jun 2024
  *      Author: piemarz
  *
  *  MIT License
@@ -28,23 +28,51 @@
  *
  */
 
-#ifndef __CONFIG_H_
-#define __CONFIG_H_
+#ifndef __DEEPSLEEP_H_
+#define __DEEPSLEEP_H_
 
-#define TIME_TO_SLEEP 30 /* Time ESP32 will go to sleep (in seconds) */
-#define DHT_PIN 27       /* ESP32 communication pin with DHT11/DHT22 */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
-const char WIFI_SSID[] = "YOUR_WIFI_SSID";         // CHANGE TO YOUR WIFI SSID
-const char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD"; // CHANGE TO YOUR WIFI PASSWORD
+/************************************
+ * INCLUDES
+ ************************************/
+#if ARDUINO < 100
+#include <WProgram.h>
+#else
+#include <Arduino.h>
+#endif
 
-const char MQTT_BROKER_ADRRESS[] = "test.mosquitto.org"; // CHANGE TO MQTT BROKER'S ADDRESS
-const int MQTT_PORT = 1883;
-const char MQTT_CLIENT_ID[] = "YOUR-NAME-esp32-001"; // CHANGE IT AS YOU DESIRE
-const char MQTT_USERNAME[] = "";                     // CHANGE IT IF REQUIRED, empty if not required
-const char MQTT_PASSWORD[] = "";                     // CHANGE IT IF REQUIRED, empty if not required
+/************************************
+ * MACROS AND DEFINES
+ ************************************/
+#define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
 
-// The MQTT topics that ESP32 should publish/subscribe
-const char PUBLISH_TOPIC[] = "YOUR-NAME-esp32-001/loopback";   // CHANGE IT AS YOU DESIRE
-const char SUBSCRIBE_TOPIC[] = "YOUR-NAME-esp32-001/loopback"; // CHANGE IT AS YOU DESIRE
+/************************************
+ * TYPEDEFS
+ ************************************/
+typedef struct {
+    int wakeTime;
+    bool setupStatusOk;
+} deepSleep_cfg_t;
 
-#endif /* __CONFIG_H_ */
+/************************************
+ * EXPORTED VARIABLES
+ ************************************/
+
+/************************************
+ * GLOBAL FUNCTION PROTOTYPES
+ ************************************/
+bool deepSleep_Init(int wakeupTimer_s);
+int deepSleep_getbootCount();
+void deepSleep_goToSleep();
+deepSleep_cfg_t deepSleep_getCfg();
+bool deepSleep_setCfg(deepSleep_cfg_t new_cfg);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __DEEPSLEEP_H_ */
