@@ -6,3 +6,6 @@ config.h
 
 # Output folder
 output/*
+
+# VSCode folder
+.vscode/*

@@ -28,15 +28,20 @@
  *
  */
 
-/** Include directives */
-#include <DHTesp.h> /** Click here to get the library: http://librarymanager/All#DHTesp */
+/************************************
+ * INCLUDES
+ ************************************/
 #include <WiFi.h>
+#include <DHTesp.h> /** Click here to get the library: http://librarymanager/All#DHTesp */
 #include <MQTTClient.h>  /** Click here to get the library: http://librarymanager/All#MQTT */
 #include <ArduinoJson.h> /** Click here to get the library: http://librarymanager/All#ArduinoJson */
+#include <Preferences.h> /** Click here to get the library: http://librarymanager/All#Preferences */
 #include "config.h"
 #include "deepSleep.h"
 
-/** Check configurations */
+/************************************
+* Check configurations
+ ************************************/
 #ifndef ESP32
 #pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
 #error Select ESP32 board.
@@ -47,17 +52,115 @@
 #error The file config.h needs to be added.
 #endif
 
+/************************************
+ * EXTERN VARIABLES
+ ************************************/
+
+/************************************
+ * PRIVATE MACROS AND DEFINES
+ ************************************/
+#define UNCONFIGURED            String("UNCONFIGURED")
+#define SERIAL_INPUT_TIMEOUT_S  10
+
+/************************************
+ * PRIVATE TYPEDEFS
+ ************************************/
+typedef struct {
+  wifi_mode_t wifiMode;
+  String wifiSsid;
+  String wifiPassword;
+} wifiConfig_t;
+
+typedef struct {
+  wifiConfig_t wifiCfg;
+} localConfig_t;
+
+/************************************
+ * STATIC VARIABLES
+ ************************************/
+static uint32_t chipId = 0;
+static DHTesp dht;
+static ComfortState cf;
+static bool connectionUp = true;
+static WiFiClient network;
+static MQTTClient mqtt = MQTTClient(256);
+static Preferences configuration;
+static localConfig_t localCfg; 
+String serialRXString;
+
+/************************************
+ * GLOBAL VARIABLES
+ ************************************/
+
+/************************************
+ * STATIC FUNCTION PROTOTYPES
+ ************************************/
 bool getTemperature();
 void getChipId();
 void connectToMQTT();
 void sendToMQTT();
 void messageHandler(String &topic, String &payload);
+void startConfiguration(void);
 
-uint32_t chipId = 0;
-DHTesp dht;
-/** Comfort profile */
-ComfortState cf;
-bool connectionUp = true;
+/************************************
+ * GLOBAL FUNCTIONS
+ ************************************/
+
+/************************************
+ * STATIC FUNCTIONS
+ ************************************/
+
+void startConfiguration(void)
+{
+  Serial.println("***************************");
+  Serial.println("Starting wifi configuration");
+  Serial.println("");
+  Serial.println("Insert Wifi SSID:");
+  // readString();
+}
+
+String readString(void)
+{
+  String inputString;
+  bool stringComplete = false;
+  unsigned long currentMillis;
+
+  while (!stringComplete) {
+    /* Check if bytes are available */
+    currentMillis = millis();
+    serialRXString = "";
+    while (Serial.available() == 0 && (millis() - currentMillis) < (1000ULL * SERIAL_INPUT_TIMEOUT_S));
+    log_i("Exiting first while loop");
+    inputString = serialRXString;
+    /* Check correctness */
+    if (stringComplete) {
+      Serial.println("Got:");
+      Serial.println(inputString);
+      Serial.println("Is it correct? Y/N");
+      currentMillis = millis();
+      serialRXString = "";
+      while (Serial.available() == 0 && (millis() - currentMillis) < (1000ULL * SERIAL_INPUT_TIMEOUT_S));
+      log_i("Exiting second while loop");
+      inputString = serialRXString;
+      if (String("N") == inputString) {
+        inputString = "";
+        stringComplete = false;
+      }
+    }
+  }
+
+  return inputString;
+}
+
+void onReceiveFunction(void) {
+  // This is a callback function that will be activated on UART RX events
+  size_t available = Serial.available();
+  Serial.printf("onReceive Callback:: There are %d bytes available: ", available);
+
+  while (available --) {
+    serialRXString += (char)Serial.read();
+  }
+}
 
 /*TEST*/
 struct TEST
@@ -70,17 +173,26 @@ struct TEST
 };
 struct TEST TESTT;
 
-WiFiClient network;
-MQTTClient mqtt = MQTTClient(256);
-
 void setup()
 {
   /* Initialize serial */
   Serial.begin(115200);
+  Serial.onReceive(onReceiveFunction);
   delay(100); /* wait 100 ms to let Serial monitor initialize */
   getChipId();
+  configuration.begin("esp32TempSensor");
 
-  WiFi.mode(WIFI_STA);
+  log_i("Checking wifi configuration");
+  localCfg.wifiCfg.wifiMode = (wifi_mode_t)configuration.getUChar("wifiMode", (uint8_t)WIFI_STA);
+  localCfg.wifiCfg.wifiSsid = configuration.getString("wifiSsid", UNCONFIGURED);
+  localCfg.wifiCfg.wifiPassword = configuration.getString("wifiPassword", UNCONFIGURED);
+
+  if ((UNCONFIGURED == localCfg.wifiCfg.wifiPassword) || (UNCONFIGURED == localCfg.wifiCfg.wifiSsid)) {
+    log_w("Wifi not configured");
+    startConfiguration();
+  }
+
+  WiFi.mode(localCfg.wifiCfg.wifiMode);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   Serial.println("ESP32 - Connecting to Wi-Fi");
