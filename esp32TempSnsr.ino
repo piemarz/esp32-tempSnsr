@@ -59,16 +59,20 @@
 /************************************
  * PRIVATE MACROS AND DEFINES
  ************************************/
-#define UNCONFIGURED            String("UNCONFIGURED")
+#define UNCONFIGURED            "UNCONFIGURED\0            "
 #define SERIAL_INPUT_TIMEOUT_S  10
+#define WIFI_SSID_PSW_MA_LEN    64
+#define INIT_STS_OK             true
+#define INIT_STS_NOK            false
 
 /************************************
  * PRIVATE TYPEDEFS
  ************************************/
 typedef struct {
   wifi_mode_t wifiMode;
-  String wifiSsid;
-  String wifiPassword;
+  char wifiSsid[WIFI_SSID_PSW_MA_LEN];
+  char wifiPassword[WIFI_SSID_PSW_MA_LEN];
+  bool config_init;
 } wifiConfig_t;
 
 typedef struct {
@@ -85,8 +89,7 @@ static bool connectionUp = true;
 static WiFiClient network;
 static MQTTClient mqtt = MQTTClient(256);
 static Preferences configuration;
-static localConfig_t localCfg; 
-String serialRXString;
+static localConfig_t localCfg;
 
 /************************************
  * GLOBAL VARIABLES
@@ -100,100 +103,47 @@ void getChipId();
 void connectToMQTT();
 void sendToMQTT();
 void messageHandler(String &topic, String &payload);
-void startConfiguration(void);
+void startWifiConfig(void);
+void readString(void);
 
 /************************************
- * GLOBAL FUNCTIONS
+ * MAIN FUNCTION
  ************************************/
-
-/************************************
- * STATIC FUNCTIONS
- ************************************/
-
-void startConfiguration(void)
-{
-  Serial.println("***************************");
-  Serial.println("Starting wifi configuration");
-  Serial.println("");
-  Serial.println("Insert Wifi SSID:");
-  // readString();
-}
-
-String readString(void)
-{
-  String inputString;
-  bool stringComplete = false;
-  unsigned long currentMillis;
-
-  while (!stringComplete) {
-    /* Check if bytes are available */
-    currentMillis = millis();
-    serialRXString = "";
-    while (Serial.available() == 0 && (millis() - currentMillis) < (1000ULL * SERIAL_INPUT_TIMEOUT_S));
-    log_i("Exiting first while loop");
-    inputString = serialRXString;
-    /* Check correctness */
-    if (stringComplete) {
-      Serial.println("Got:");
-      Serial.println(inputString);
-      Serial.println("Is it correct? Y/N");
-      currentMillis = millis();
-      serialRXString = "";
-      while (Serial.available() == 0 && (millis() - currentMillis) < (1000ULL * SERIAL_INPUT_TIMEOUT_S));
-      log_i("Exiting second while loop");
-      inputString = serialRXString;
-      if (String("N") == inputString) {
-        inputString = "";
-        stringComplete = false;
-      }
-    }
-  }
-
-  return inputString;
-}
-
-void onReceiveFunction(void) {
-  // This is a callback function that will be activated on UART RX events
-  size_t available = Serial.available();
-  Serial.printf("onReceive Callback:: There are %d bytes available: ", available);
-
-  while (available --) {
-    serialRXString += (char)Serial.read();
-  }
-}
-
-/*TEST*/
-struct TEST
-{
-  float temperature;
-  float humidity;
-  float heatIndex;
-  float dewPoint;
-  String comfort;
-};
-struct TEST TESTT;
-
 void setup()
 {
   /* Initialize serial */
   Serial.begin(115200);
-  Serial.onReceive(onReceiveFunction);
-  delay(100); /* wait 100 ms to let Serial monitor initialize */
+  delay(1000); /* wait 100 ms to let Serial monitor initialize */
   getChipId();
   configuration.begin("esp32TempSensor");
 
   log_i("Checking wifi configuration");
+  strcpy(localCfg.wifiCfg.wifiSsid, UNCONFIGURED);
+  strcpy(localCfg.wifiCfg.wifiPassword, UNCONFIGURED);
   localCfg.wifiCfg.wifiMode = (wifi_mode_t)configuration.getUChar("wifiMode", (uint8_t)WIFI_STA);
-  localCfg.wifiCfg.wifiSsid = configuration.getString("wifiSsid", UNCONFIGURED);
-  localCfg.wifiCfg.wifiPassword = configuration.getString("wifiPassword", UNCONFIGURED);
+  configuration.getString("wifiSsid", localCfg.wifiCfg.wifiSsid, WIFI_SSID_PSW_MA_LEN);
+  configuration.getString("wifiPassword", localCfg.wifiCfg.wifiPassword, WIFI_SSID_PSW_MA_LEN);
+  localCfg.wifiCfg.config_init = INIT_STS_OK;
 
-  if ((UNCONFIGURED == localCfg.wifiCfg.wifiPassword) || (UNCONFIGURED == localCfg.wifiCfg.wifiSsid)) {
+  Serial.print("wifiSsid: ");
+  Serial.println(localCfg.wifiCfg.wifiSsid);
+
+  if ((strcmp(localCfg.wifiCfg.wifiSsid, UNCONFIGURED) == 0) || (strcmp(localCfg.wifiCfg.wifiPassword, UNCONFIGURED) == 0)) {
     log_w("Wifi not configured");
-    startConfiguration();
+    localCfg.wifiCfg.config_init = INIT_STS_NOK;
   }
 
+  if (!localCfg.wifiCfg.config_init) {
+    startWifiConfig();
+  }
+
+  Serial.printf("Define: %d \n", sizeof(WIFI_SSID));
+  Serial.println(WIFI_SSID);
+  Serial.printf("Config: %d \n", sizeof(localCfg.wifiCfg.wifiSsid));
+  Serial.println(localCfg.wifiCfg.wifiSsid);
+
   WiFi.mode(localCfg.wifiCfg.wifiMode);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(localCfg.wifiCfg.wifiSsid, WIFI_PASSWORD);
 
   Serial.println("ESP32 - Connecting to Wi-Fi");
 
@@ -228,6 +178,61 @@ void setup()
   deepSleep_Init(TIME_TO_SLEEP);
   Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) + " Seconds");
 }
+
+/************************************
+ * STATIC FUNCTIONS
+ ************************************/
+
+void startWifiConfig(void)
+{
+  Serial.println("***************************");
+  Serial.println("Starting wifi configuration");
+  Serial.println("");
+  Serial.println("Insert settings in this format:");
+  Serial.println("SSID: <Your WiFi name>");
+  Serial.println("PSW: <Your password>");
+
+  Serial.onReceive(readString);
+  while (!localCfg.wifiCfg.config_init) {
+    delay(500);
+  }
+  Serial.onReceive(NULL);
+}
+
+void readString(void)
+{
+  String serialRXString;
+  size_t available = Serial.available();
+  while (available --) {
+    serialRXString += (char)Serial.read();
+  }
+  Serial.print("Received: ");
+  Serial.println(serialRXString);
+  if (serialRXString.startsWith("SSID: ")) {
+    serialRXString.remove(0, (sizeof("SSID: ") - 1));
+    serialRXString.toCharArray(localCfg.wifiCfg.wifiSsid, WIFI_SSID_PSW_MA_LEN);
+  } else if (serialRXString.startsWith("PSW: ")) {
+    serialRXString.remove(0, (sizeof("PSW: ") - 1));
+    serialRXString.toCharArray(localCfg.wifiCfg.wifiPassword, WIFI_SSID_PSW_MA_LEN);
+  } else {
+    Serial.println("Wrong WiFi config input");
+  }
+  if ((strcmp(localCfg.wifiCfg.wifiSsid, UNCONFIGURED) != 0) && (strcmp(localCfg.wifiCfg.wifiPassword, UNCONFIGURED) != 0)) {
+    log_i("Wifi configured");
+    localCfg.wifiCfg.config_init = INIT_STS_OK;
+  }
+}
+
+/*TEST*/
+struct TEST
+{
+  float temperature;
+  float humidity;
+  float heatIndex;
+  float dewPoint;
+  String comfort;
+};
+struct TEST TESTT;
 
 void loop()
 {
@@ -312,6 +317,7 @@ bool getTemperature()
 
 void getChipId()
 {
+  log_i("Show chip ID");
   for (int i = 0; i < 17; i = i + 8)
   {
     chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
