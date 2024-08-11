@@ -38,6 +38,9 @@
 #include <Preferences.h> /** Click here to get the library: http://librarymanager/All#Preferences */
 #include "config.h"
 #include "deepSleep.h"
+#if (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  #include "esp32-hal-periman.h"
+#endif /* ESP_ARDUINO_VERSION_MAJOR >= 3 */
 
 /************************************
 * Check configurations
@@ -55,13 +58,15 @@
 /************************************
  * EXTERN VARIABLES
  ************************************/
+extern EspClass ESP;
 
 /************************************
  * PRIVATE MACROS AND DEFINES
  ************************************/
-#define UNCONFIGURED            "UNCONFIGURED\0            "
-#define SERIAL_INPUT_TIMEOUT_S  10
-#define WIFI_SSID_PSW_MA_LEN    64
+#define UNCONFIGURED            "UNCONFIGURED\0"
+#define WIFI_SSID_PSW_MAX_LEN   64
+#define APP_DEVICE_NAME_MAX_LEN 64
+#define SLEEP_TIME              ((uint16_t) 30)      /* Time ESP32 will go to sleep (in seconds) */
 #define INIT_STS_OK             true
 #define INIT_STS_NOK            false
 
@@ -70,13 +75,24 @@
  ************************************/
 typedef struct {
   wifi_mode_t wifiMode;
-  char wifiSsid[WIFI_SSID_PSW_MA_LEN];
-  char wifiPassword[WIFI_SSID_PSW_MA_LEN];
-  bool config_init;
+  char wifiSsid[WIFI_SSID_PSW_MAX_LEN];
+  char wifiPassword[WIFI_SSID_PSW_MAX_LEN];
+  bool configInit;
 } wifiConfig_t;
 
 typedef struct {
+  uint16_t sleepTime;
+} deepSleepConfig_t;
+
+typedef struct {
+  char deviceName[APP_DEVICE_NAME_MAX_LEN];
+  bool configInit;
+} appConfig_t;
+
+typedef struct {
   wifiConfig_t wifiCfg;
+  deepSleepConfig_t deepSleepCfg;
+  appConfig_t appConfig;
 } localConfig_t;
 
 /************************************
@@ -103,8 +119,11 @@ void getChipId();
 void connectToMQTT();
 void sendToMQTT();
 void messageHandler(String &topic, String &payload);
-void startWifiConfig(void);
-void readString(void);
+void startWiFiConfig(void);
+void readWiFiConfig(void);
+void startDeviceConfig(void);
+void readDeviceConfig(void);
+void saveSettings(void);
 
 /************************************
  * MAIN FUNCTION
@@ -113,39 +132,53 @@ void setup()
 {
   /* Initialize serial */
   Serial.begin(115200);
-  delay(1000); /* wait 100 ms to let Serial monitor initialize */
+  delay(1000); /* wait 1s to let Serial monitor initialize */
   getChipId();
   configuration.begin("esp32TempSensor");
 
   log_i("Checking wifi configuration");
+  log_v("If the WiFi is not configured ask for the configuration through serial communication");
   strcpy(localCfg.wifiCfg.wifiSsid, UNCONFIGURED);
   strcpy(localCfg.wifiCfg.wifiPassword, UNCONFIGURED);
-  localCfg.wifiCfg.wifiMode = (wifi_mode_t)configuration.getUChar("wifiMode", (uint8_t)WIFI_STA);
-  configuration.getString("wifiSsid", localCfg.wifiCfg.wifiSsid, WIFI_SSID_PSW_MA_LEN);
-  configuration.getString("wifiPassword", localCfg.wifiCfg.wifiPassword, WIFI_SSID_PSW_MA_LEN);
-  localCfg.wifiCfg.config_init = INIT_STS_OK;
-
-  Serial.print("wifiSsid: ");
-  Serial.println(localCfg.wifiCfg.wifiSsid);
+  localCfg.wifiCfg.wifiMode = (wifi_mode_t)configuration.getUChar(KEY_WIFIMODE, (uint8_t)WIFI_STA);
+  configuration.getString(KEY_WIFIID, localCfg.wifiCfg.wifiSsid, WIFI_SSID_PSW_MAX_LEN);
+  configuration.getString(KEY_WIFIPSW, localCfg.wifiCfg.wifiPassword, WIFI_SSID_PSW_MAX_LEN);
+  localCfg.wifiCfg.configInit = INIT_STS_OK;
 
   if ((strcmp(localCfg.wifiCfg.wifiSsid, UNCONFIGURED) == 0) || (strcmp(localCfg.wifiCfg.wifiPassword, UNCONFIGURED) == 0)) {
     log_w("Wifi not configured");
-    localCfg.wifiCfg.config_init = INIT_STS_NOK;
+    localCfg.wifiCfg.configInit = INIT_STS_NOK;
   }
 
-  if (!localCfg.wifiCfg.config_init) {
-    startWifiConfig();
+  log_i("Checking deep sleep configuration");
+  localCfg.deepSleepCfg.sleepTime = configuration.getUShort(KEY_SLEEPTIME, 0);
+
+  if (localCfg.deepSleepCfg.sleepTime == 0u) {
+    log_w("Invalid deep sleep time configuration: %d - set to default (%d)", localCfg.deepSleepCfg.sleepTime, SLEEP_TIME);
+    localCfg.deepSleepCfg.sleepTime = SLEEP_TIME;
   }
 
-  Serial.printf("Define: %d \n", sizeof(WIFI_SSID));
-  Serial.println(WIFI_SSID);
-  Serial.printf("Config: %d \n", sizeof(localCfg.wifiCfg.wifiSsid));
-  Serial.println(localCfg.wifiCfg.wifiSsid);
+  strcpy(localCfg.appConfig.deviceName, UNCONFIGURED);
+  configuration.getString(KEY_DEVICENAME, localCfg.appConfig.deviceName, APP_DEVICE_NAME_MAX_LEN);
+  localCfg.appConfig.configInit = INIT_STS_OK;
+  log_i("Checking device condifuration");
+  if ((strcmp(localCfg.appConfig.deviceName, UNCONFIGURED) == 0)) {
+    log_w("Device name not configured");
+    localCfg.appConfig.configInit = INIT_STS_NOK;
+  }
+
+  if (INIT_STS_NOK == localCfg.wifiCfg.configInit) {
+    startWiFiConfig();
+  }
+
+  if (INIT_STS_NOK == localCfg.appConfig.configInit) {
+    startDeviceConfig();
+  }
 
   WiFi.mode(localCfg.wifiCfg.wifiMode);
-  WiFi.begin(localCfg.wifiCfg.wifiSsid, WIFI_PASSWORD);
+  WiFi.begin(localCfg.wifiCfg.wifiSsid, localCfg.wifiCfg.wifiPassword);
 
-  Serial.println("ESP32 - Connecting to Wi-Fi");
+  log_i("ESP32 - Connecting to Wi-Fi: %s", localCfg.wifiCfg.wifiSsid);
 
   uint8_t tentatives = ATTEMPING_CONNECTION;
 
@@ -153,37 +186,52 @@ void setup()
   {
     delay(500);
     tentatives--;
-    Serial.print(".");
+
     if (tentatives == 0u)
     {
-      Serial.println();
-      Serial.println("Unable to connect to " + String(WIFI_SSID));
+      log_e("Unable to connect to %s", localCfg.wifiCfg.wifiSsid);
       connectionUp = false;
       break;
     }
   }
-  Serial.println();
 
   if (connectionUp)
   {
     connectToMQTT();
   }
-  Serial.println("Boot number: " + String(deepSleep_getbootCount()));
+
+  log_i("Boot number: %d", deepSleep_getbootCount());
 
   /* Initialize temperature sensor */
+#if (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  if (!perimanSetPinBus(DHT_PIN, ESP32_BUS_TYPE_GPIO, (void *)(DHT_PIN + 1), -1, -1)) {
+    log_e("Failed to initialize pin %d", DHT_PIN);
+  }
+#endif /* ESP_ARDUINO_VERSION_MAJOR >= 3 */
+
   dht.setup(DHT_PIN, DHTesp::DHT11);
-  Serial.println("DHT initiated");
+  log_i("DHT initiated");
 
   /* Configure the wake up source */
-  deepSleep_Init(TIME_TO_SLEEP);
-  Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) + " Seconds");
+  log_i("Setup ESP32 to sleep for %d Seconds", localCfg.deepSleepCfg.sleepTime);
+  deepSleep_Init(localCfg.deepSleepCfg.sleepTime);
+}
+
+void loop()
+{
+  getTemperature();
+  log_i("Save settings");
+  saveSettings();
+  log_i("Going to sleep");
+  Serial.flush();
+  deepSleep_goToSleep();
 }
 
 /************************************
  * STATIC FUNCTIONS
  ************************************/
 
-void startWifiConfig(void)
+void startWiFiConfig(void)
 {
   Serial.println("***************************");
   Serial.println("Starting wifi configuration");
@@ -192,34 +240,70 @@ void startWifiConfig(void)
   Serial.println("SSID: <Your WiFi name>");
   Serial.println("PSW: <Your password>");
 
-  Serial.onReceive(readString);
-  while (!localCfg.wifiCfg.config_init) {
+  Serial.onReceive(readWiFiConfig);
+  while (!localCfg.wifiCfg.configInit) {
     delay(500);
   }
   Serial.onReceive(NULL);
 }
 
-void readString(void)
+void readWiFiConfig(void)
 {
   String serialRXString;
   size_t available = Serial.available();
-  while (available --) {
+  while (available--) {
     serialRXString += (char)Serial.read();
   }
   Serial.print("Received: ");
   Serial.println(serialRXString);
   if (serialRXString.startsWith("SSID: ")) {
     serialRXString.remove(0, (sizeof("SSID: ") - 1));
-    serialRXString.toCharArray(localCfg.wifiCfg.wifiSsid, WIFI_SSID_PSW_MA_LEN);
+    serialRXString.toCharArray(localCfg.wifiCfg.wifiSsid, WIFI_SSID_PSW_MAX_LEN);
   } else if (serialRXString.startsWith("PSW: ")) {
     serialRXString.remove(0, (sizeof("PSW: ") - 1));
-    serialRXString.toCharArray(localCfg.wifiCfg.wifiPassword, WIFI_SSID_PSW_MA_LEN);
+    serialRXString.toCharArray(localCfg.wifiCfg.wifiPassword, WIFI_SSID_PSW_MAX_LEN);
   } else {
     Serial.println("Wrong WiFi config input");
   }
   if ((strcmp(localCfg.wifiCfg.wifiSsid, UNCONFIGURED) != 0) && (strcmp(localCfg.wifiCfg.wifiPassword, UNCONFIGURED) != 0)) {
     log_i("Wifi configured");
-    localCfg.wifiCfg.config_init = INIT_STS_OK;
+    localCfg.wifiCfg.configInit = INIT_STS_OK;
+  }
+}
+
+void startDeviceConfig(void)
+{
+  Serial.println("***************************");
+  Serial.println("Starting device configuration");
+  Serial.println("");
+  Serial.println("Insert settings in this format:");
+  Serial.println("NAME: <Your device name>");
+
+  Serial.onReceive(readDeviceConfig);
+  while (!localCfg.appConfig.configInit) {
+    delay(500);
+  }
+  Serial.onReceive(NULL);
+}
+
+void readDeviceConfig(void)
+{
+  String serialRXString;
+  size_t available = Serial.available();
+  while (available--) {
+    serialRXString += (char)Serial.read();
+  }
+  Serial.print("Received: ");
+  Serial.println(serialRXString);
+  if (serialRXString.startsWith("NAME: ")) {
+    serialRXString.remove(0, (sizeof("NAME: ") - 1));
+    serialRXString.toCharArray(localCfg.appConfig.deviceName, APP_DEVICE_NAME_MAX_LEN);
+  } else {
+    Serial.println("Wrong device config input");
+  }
+  if (strcmp(localCfg.appConfig.deviceName, UNCONFIGURED) != 0) {
+    log_i("Device configured");
+    localCfg.appConfig.configInit = INIT_STS_OK;
   }
 }
 
@@ -233,14 +317,6 @@ struct TEST
   String comfort;
 };
 struct TEST TESTT;
-
-void loop()
-{
-  getTemperature();
-  Serial.println("Going to sleep now");
-  Serial.flush();
-  deepSleep_goToSleep();
-}
 
 /**
  * getTemperature
@@ -317,16 +393,15 @@ bool getTemperature()
 
 void getChipId()
 {
-  log_i("Show chip ID");
+  log_v("Show chip ID");
   for (int i = 0; i < 17; i = i + 8)
   {
     chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
   }
 
-  Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
-  Serial.printf("This chip has %d cores\n", ESP.getChipCores());
-  Serial.print("Chip ID: ");
-  Serial.println(chipId);
+  log_v("ESP32 Chip model = %s Rev %d", ESP.getChipModel(), ESP.getChipRevision());
+  log_v("This chip has %d cores", ESP.getChipCores());
+  log_v("Chip ID: %d", chipId);
 }
 
 void connectToMQTT()
@@ -339,16 +414,21 @@ void connectToMQTT()
 
   Serial.print("ESP32 - Connecting to MQTT broker");
 
+  uint8_t tentatives = ATTEMPING_CONNECTION;
+
   while (!mqtt.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD))
   {
-    Serial.print(".");
     delay(100);
+    tentatives--;
+
+    if(0 == tentatives) {
+      log_e("Unable to connect to %s", MQTT_CLIENT_ID);
+    }
   }
-  Serial.println();
 
   if (!mqtt.connected())
   {
-    Serial.println("ESP32 - MQTT broker Timeout!");
+    log_e("ESP32 - MQTT broker Timeout!");
     return;
   }
 
@@ -389,4 +469,19 @@ void messageHandler(String &topic, String &payload)
   Serial.println("- topic: " + topic);
   Serial.println("- payload:");
   Serial.println(payload);
+}
+
+void saveSettings(void)
+{
+  /* Wifi settings */
+  configuration.putUChar(KEY_WIFIMODE, (uint8_t)localCfg.wifiCfg.wifiMode);
+  configuration.putString(KEY_WIFIID, localCfg.wifiCfg.wifiSsid);
+  configuration.putString(KEY_WIFIPSW, localCfg.wifiCfg.wifiPassword);
+
+  /* Deep sleep settings */
+  configuration.putUShort(KEY_SLEEPTIME, localCfg.deepSleepCfg.sleepTime);
+
+  /* Device settings */
+  configuration.putString(KEY_DEVICENAME, localCfg.appConfig.deviceName);
+
 }

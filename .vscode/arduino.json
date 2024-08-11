@@ -4,5 +4,5 @@
     "port": "COM3",
     "programmer": "esptool",
     "sketch": "esp32TempSnsr.ino",
-    "output": "output"
+    "output": "..\\tempSensorOutput"
 }
